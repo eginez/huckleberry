@@ -1,0 +1,8 @@
+pom.xml
+*jar
+/lib/
+/classes/
+.lein-deps-sum
+resources/public/cljs/
+node_modules/
+out/
