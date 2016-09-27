@@ -37,14 +37,14 @@
           (when (and
                   (not error)
                   (= 200 (.-statusCode response)))
-            (println (str "Downloaded from " url))
+            ;(println (str "Downloaded from " url))
             (put! cout body))))
   cout)
 
 (defn read-file [cout fpath]
   (.readFile fs fpath "utf-8"
              (fn [err data] (when-not err
-                              (println "Read file " fpath)
+                              ;(println "Read file " fpath)
                               (put! cout  data))))
   cout)
 
@@ -82,6 +82,7 @@
                     (map clean-deps)
                     (map #(map mvndep->dep %))
                     (map #(into #{} %))
+                    (map #(conj [] url %))
                     ))]
     (read-url-chan c url)))
 
@@ -96,40 +97,43 @@
   (go-loop [next dep
             to-do #{}
             done {}
+            locations #{}
             exclusions (into #{} (:exclusions dep))
             status true]
            (if next
              (do
-               (println next)
+               ;(println next)
                (let [no-excl (dissoc next :exclusions)
                      url-set (create-urls-for-dependency repositories no-excl)
                      urls (map first url-set)
                      repo-reqs (extract-dependencies urls)
                      tout (timeout 5000)
                      repo-reqs (conj repo-reqs tout)
-                     [deps ch] (alts! repo-reqs)
+                     [[url deps] ch] (alts! repo-reqs)
                      to-kill (filter #(not (identical? ch %)) repo-reqs)
                      real-deps (set/difference deps exclusions) ;?
                      new-dep (set/union to-do real-deps)
-                     done (into done {no-excl new-dep})]
+                     new-locations (set/union locations (conj #{} (assoc no-excl :url url)))
+                     done (into done {no-excl real-deps})]
                  (if (not (identical? tout ch))
                    (do
                      (map close! to-kill)
-                     (recur (first new-dep) (rest new-dep) done exclusions true))
-                   (recur nil nil next [] false))))
-             [status done])))
+                     (recur (first new-dep) (rest new-dep) done new-locations exclusions true))
+                   (recur nil nil next [] [] false))))
+             [status done locations])))
 
 (defn resolve-all [all-deps & opts]
   (go
     (loop [deps all-deps
-           dg {}
+           dg []
+           locations #{}
            r-status true]
       (if (and r-status (-> deps empty? not))
         (let [to-resolve (first deps)
-              [status res-dep] (<! (apply resolve to-resolve opts))
-              new-dg (into dg res-dep)]
-          (recur (rest deps) new-dg status))
-        [r-status dg]))))
+              [status res-dep new-locations] (<! (apply resolve to-resolve opts))
+              new-dg (conj dg to-resolve res-dep)]
+          (recur (rest deps) new-dg (set/union locations new-locations) status))
+        [r-status dg locations]))))
 
 (defn- group
   [group-artifact]
@@ -161,8 +165,14 @@
    ;:optional optional
    :exclusions (map (comp exclusion normalize-exclusion-spec) exclusions)})
 
-(defn retrieve-deps [deps-chan local-repo]
-  nil)
+(defn retrieve [dep in-repo]
+  (let [url (:url dep)
+        jar-url (str/replace url #"pom" "jar")]
+  (println "Downloading " jar-url " to " in-repo)))
+
+(defn retrieve-deps [[status dg dep-list] local-repo]
+  (let [remote-deps (filter #(-> % :url is-url-local? not) dep-list)]
+    (map #(retrieve % local-repo) remote-deps)))
 
 (defn resolve-dependencies
   [& {:keys [repositories coordinates managed-coordinates files retrieve local-repo
