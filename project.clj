@@ -3,8 +3,8 @@
   :min-lein-version "2.5.3"
 
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.8.51"]
-                 [org.clojure/core.async "0.2.374"]]
+                 [org.clojure/clojurescript "1.9.229"]
+                 [org.clojure/core.async "0.2.391"]]
 
   :plugins [[lein-cljsbuild "1.1.3"]
             [lein-cljfmt "0.5.3"]

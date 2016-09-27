@@ -1,5 +1,5 @@
 (ns eginez.huckleberry.core
-  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require-macros [cljs.core.async.macros :refer [go-loop go]])
   (:refer-clojure :exclude  [type proxy])
   (:require [cljs.nodejs :as nodejs]
             [cljs.core.async :refer [timeout close! put! chan <! >! take!  pipeline alts! poll!] :as async]
@@ -88,39 +88,91 @@
 (defn extract-dependencies [urls]
   (map create-pipeline urls))
 
-(defn resolve [dep]
-  (let [x (chan)]
-    (go
-      (loop [next dep
-             to-do #{}
-             done #{}
-             status true]
-        (if next
-          (do
-            (println "Looking for dependencies for " next)
-            (let [url-set (create-urls-for-dependency (vals repos) next)
-                  urls (map first url-set)
-                  repo-reqs (extract-dependencies urls)
-                  tout (timeout 2000)
-                  repo-reqs (conj repo-reqs tout)
-                  [deps ch] (alts! repo-reqs)
-                  to-kill (filter #(not (identical? ch %)) repo-reqs)
-                  not-done (set/difference deps done)
-                  new-dep (set/union to-do not-done)
-                  done (conj done next) ]
-              (if (not (identical? tout ch))
-                (do
-                  (map close! to-kill)
-                  (recur (first new-dep) (rest new-dep) done true))
-                (recur nil nil next false))))
-          (put! x [status done])))
-      (close! x))
-    x))
+(defn artifact->coordinate [artifact]
+  (str (:group artifact) "/" (:artifact artifact)))
 
 
-(defn resolve-dependencies [coordinates repos]
-  (println coordinates)
-  )
+(defn resolve [dep &{:keys [repositories local-repo]} ]
+  (go-loop [next dep
+            to-do #{}
+            done {}
+            exclusions (into #{} (:exclusions dep))
+            status true]
+           (if next
+             (do
+               (println next)
+               (let [no-excl (dissoc next :exclusions)
+                     url-set (create-urls-for-dependency repositories no-excl)
+                     urls (map first url-set)
+                     repo-reqs (extract-dependencies urls)
+                     tout (timeout 5000)
+                     repo-reqs (conj repo-reqs tout)
+                     [deps ch] (alts! repo-reqs)
+                     to-kill (filter #(not (identical? ch %)) repo-reqs)
+                     real-deps (set/difference deps exclusions) ;?
+                     new-dep (set/union to-do real-deps)
+                     done (into done {no-excl new-dep})]
+                 (if (not (identical? tout ch))
+                   (do
+                     (map close! to-kill)
+                     (recur (first new-dep) (rest new-dep) done exclusions true))
+                   (recur nil nil next [] false))))
+             [status done])))
 
-(defn retrieve-dependencies [deps-graph]
+(defn resolve-all [all-deps & opts]
+  (go
+    (loop [deps all-deps
+           dg {}
+           r-status true]
+      (if (and r-status (-> deps empty? not))
+        (let [to-resolve (first deps)
+              [status res-dep] (<! (apply resolve to-resolve opts))
+              new-dg (into dg res-dep)]
+          (recur (rest deps) new-dg status))
+        [r-status dg]))))
+
+(defn- group
+  [group-artifact]
+  (or (namespace group-artifact) (name group-artifact)))
+
+
+(defn- exclusion
+  [[group-artifact & {:as opts}]]
+  {:group (group group-artifact)
+   :artifact (name group-artifact)
+   :classifier (:classifier opts "*")
+   :extension (:extension opts "*")})
+
+(defn- normalize-exclusion-spec [spec]
+  (if (symbol? spec)
+    [spec]
+    spec))
+
+(defn- dependency
+  [[group-artifact version & {:keys [scope optional exclusions]
+                              :as opts
+                              :or {scope "compile"
+                                   optional false}}
+    :as dep-spec]]
+  {:group (group group-artifact)
+   :artifact (name group-artifact)
+   :version version
+   ;:scope scope
+   ;:optional optional
+   :exclusions (map (comp exclusion normalize-exclusion-spec) exclusions)})
+
+(defn retrieve-deps [deps-chan local-repo]
   nil)
+
+(defn resolve-dependencies
+  [& {:keys [repositories coordinates managed-coordinates files retrieve local-repo
+             transfer-listener offline? proxy mirrors repository-session-fn]
+      :or {retrieve true}}]
+  (go
+    (let [repos (or repositories (vals repos))
+          deps-map (map dependency coordinates)
+          deps-chan (<! (resolve-all deps-map :repositories repos
+                                     :local-repo local-repo))]
+      (if retrieve (retrieve-deps deps-chan local-repo) deps-chan))))
+
+

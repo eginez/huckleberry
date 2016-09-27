@@ -6,3 +6,6 @@ pom.xml
 resources/public/cljs/
 node_modules/
 out/
+.idea
+huckleberry.iml
+target/
