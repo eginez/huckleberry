@@ -74,7 +74,7 @@
     y))
 
 
-(defn create-pipeline [url]
+(defn read-dependency-pipeline [url]
   (let [c (chan 1 (comp
                     (map parse-xml)
                     (map #(js->clj % :keywordize-keys true))
@@ -87,7 +87,7 @@
     (read-url-chan c url)))
 
 (defn extract-dependencies [urls]
-  (map create-pipeline urls))
+  (map read-dependency-pipeline urls))
 
 (defn artifact->coordinate [artifact]
   (str (:group artifact) "/" (:artifact artifact)))
@@ -111,14 +111,12 @@
                      repo-reqs (conj repo-reqs tout)
                      [[url deps] ch] (alts! repo-reqs)
                      to-kill (filter #(not (identical? ch %)) repo-reqs)
-                     ;real-deps (set/difference (into #{} (map #(dissoc % :version) deps)) exclusions) ;?
                      real-deps (filter (fn [x]
                                            (empty? (filter #(and
                                                      (= (:group %) (:group x))
                                                      (= (:artifact %) (:artifact x))) exclusions)))
                                  deps)
 
-                     ;real-deps (set/difference deps exclusions) ;?
                      new-dep (set/union to-do real-deps)
                      new-locations (set/union locations (conj #{} (assoc no-excl :url url)))
                      done (into done {no-excl real-deps})]
@@ -150,9 +148,9 @@
 (defn- exclusion
   [[group-artifact & {:as opts}]]
   {:group (group group-artifact)
-   :artifact (name group-artifact)})
-   ;:classifier (:classifier opts "*")
-   ;:extension (:extension opts "*")})
+   :artifact (name group-artifact)
+   :classifier (:classifier opts "*")
+   :extension (:extension opts "*")})
 
 (defn- normalize-exclusion-spec [spec]
   (if (symbol? spec)
@@ -177,19 +175,21 @@
         jar-url (str/replace url #"pom" "jar")]
   (println "Downloading " jar-url " to " in-repo)))
 
-(defn retrieve-deps [[status dg dep-list] local-repo]
+(defn retrieve-dependencies [[status dg dep-list] local-repo offline?]
   (let [remote-deps (filter #(-> % :url is-url-local? not) dep-list)]
-    (map #(retrieve % local-repo) remote-deps)))
+    (if offline?
+      nil
+      (map #(retrieve % local-repo) remote-deps))))
 
 (defn resolve-dependencies
-  [& {:keys [repositories coordinates managed-coordinates files retrieve local-repo
-             transfer-listener offline? proxy mirrors repository-session-fn]
+  [& {:keys [repositories coordinates retrieve local-repo offline?
+             proxy mirrors rmanaged-coordinates repository-session-fn]
       :or {retrieve true}}]
   (go
     (let [repos (or repositories (vals repos))
           deps-map (map dependency coordinates)
           deps-chan (<! (resolve-all deps-map :repositories repos
                                      :local-repo local-repo))]
-      (if retrieve (retrieve-deps deps-chan local-repo) deps-chan))))
+      (if retrieve (retrieve-dependencies deps-chan local-repo offline?) deps-chan))))
 
 

@@ -83,16 +83,6 @@
         (done)
         ))))
 
-;(deftest test-resolve-coordinates-download
-;  (async done
-;    (go
-;      (let [[status d l] (<! (maven/resolve-dependencies :coordinates '[[commons-logging "1.1"]]
-;                                                         :retrieve true
-;                                                         :local-repo nil))]
-;        (is (= 2 (count d)))
-;        (is (= 5 (-> d second keys count)))
-;        (done)
-;        ))))
 
 (deftest test-resolve-dep2
   (let [deps '[[commons-logging "1.1"]
@@ -109,7 +99,16 @@
           (is (= 4 (count dp)))
           (is (= 5 (-> dp second keys count)))
           (is (= 1 (count (last dp))))
-          (pp/pprint dp)
-          ;(pp/pprint list)
           (done)
           )))))
+
+;(deftest test-resolve-coordinates-download
+;  (async done
+;    (go
+;      (let [[status d l] (<! (maven/resolve-dependencies :coordinates '[[commons-logging "1.1"]]
+;                                                         :retrieve true
+;                                                         :local-repo nil))]
+;        (is (= 2 (count d)))
+;        (is (= 5 (-> d second keys count)))
+;        (done)
+;        ))))
