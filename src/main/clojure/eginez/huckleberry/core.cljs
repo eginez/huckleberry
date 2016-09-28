@@ -98,7 +98,7 @@
             to-do #{}
             done {}
             locations #{}
-            exclusions (into #{} (:exclusions dep))
+            exclusions (:exclusions dep)
             status true]
            (if next
              (do
@@ -111,7 +111,14 @@
                      repo-reqs (conj repo-reqs tout)
                      [[url deps] ch] (alts! repo-reqs)
                      to-kill (filter #(not (identical? ch %)) repo-reqs)
-                     real-deps (set/difference deps exclusions) ;?
+                     ;real-deps (set/difference (into #{} (map #(dissoc % :version) deps)) exclusions) ;?
+                     real-deps (filter (fn [x]
+                                           (empty? (filter #(and
+                                                     (= (:group %) (:group x))
+                                                     (= (:artifact %) (:artifact x))) exclusions)))
+                                 deps)
+
+                     ;real-deps (set/difference deps exclusions) ;?
                      new-dep (set/union to-do real-deps)
                      new-locations (set/union locations (conj #{} (assoc no-excl :url url)))
                      done (into done {no-excl real-deps})]
@@ -143,9 +150,9 @@
 (defn- exclusion
   [[group-artifact & {:as opts}]]
   {:group (group group-artifact)
-   :artifact (name group-artifact)
-   :classifier (:classifier opts "*")
-   :extension (:extension opts "*")})
+   :artifact (name group-artifact)})
+   ;:classifier (:classifier opts "*")
+   ;:extension (:extension opts "*")})
 
 (defn- normalize-exclusion-spec [spec]
   (if (symbol? spec)

@@ -83,30 +83,33 @@
         (done)
         ))))
 
-(deftest test-resolve-coordinates-download
-  (async done
-    (go
-      (let [[status d l] (<! (maven/resolve-dependencies :coordinates '[[commons-logging "1.1"]]
-                                                         :retrieve true
-                                                         :local-repo nil))]
-        (is (= 2 (count d)))
-        (is (= 5 (-> d second keys count)))
-        (done)
-        ))))
+;(deftest test-resolve-coordinates-download
+;  (async done
+;    (go
+;      (let [[status d l] (<! (maven/resolve-dependencies :coordinates '[[commons-logging "1.1"]]
+;                                                         :retrieve true
+;                                                         :local-repo nil))]
+;        (is (= 2 (count d)))
+;        (is (= 5 (-> d second keys count)))
+;        (done)
+;        ))))
 
-;(comment
-;(deftest test-resolve-dep2
-;  (let [deps '[[commons-logging "1.1"]
-;               [log4j "1.2.15" :exclusions [[javax.mail/mail :extension "jar"]
-;                                            [javax.jms/jms :classifier "*"]
-;                                            com.sun.jdmk/jmxtools
-;                                            com.sun.jmx/jmxri]]]
-;        ]
-;    (async done
-;      (go
-;        (let [[status dp] (<! (maven/resolve-dependencies :coordinates deps
-;                                                      :retrieve false
-;                                                      :local-repo tmp-local-repo-dir))]
-;          (println dp)
-;          (done)
-;          ))))))
+(deftest test-resolve-dep2
+  (let [deps '[[commons-logging "1.1"]
+               [log4j "1.2.15" :exclusions [[javax.mail/mail :extension "jar"]
+                                            [javax.jms/jms :classifier "*"]
+                                            com.sun.jdmk/jmxtools
+                                            com.sun.jmx/jmxri]]]
+        ]
+    (async done
+      (go
+        (let [[status dp list] (<! (maven/resolve-dependencies :coordinates deps
+                                                      :retrieve false
+                                                      :local-repo nil))]
+          (is (= 4 (count dp)))
+          (is (= 5 (-> dp second keys count)))
+          (is (= 1 (count (last dp))))
+          (pp/pprint dp)
+          ;(pp/pprint list)
+          (done)
+          )))))
