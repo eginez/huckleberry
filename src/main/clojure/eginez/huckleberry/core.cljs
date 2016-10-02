@@ -13,6 +13,7 @@
 (def repos {:clojars "https://clojars.org/repo"
             :local (.join path (-> nodejs/process .-env .-HOME) ".m2" "repository")
             :maven-central "https://repo1.maven.org/maven2"})
+;(def dbg (aset request "debug" true))
 
 (defn is-url-local? [url]
   (not (str/starts-with? url "http")))
@@ -23,7 +24,7 @@
         art (str/join "-" [artifact version])
         art-url (str/join sep [repo g artifact version art])
         ext ["pom" "jar"]]
-    (map #(str/join "." [art-url %]) ext)))
+    [repo (map #(str/join "." [art-url %]) ext)]))
 
 
 (defn create-urls-for-dependency [repos d]
@@ -32,12 +33,13 @@
     (create-remote-url-for-depedency repos d)))
 
 (defn make-http-request [cout url]
-  (.get request #js {:url url}
+  (.get request #js {:url url :encoding nil}
         (fn [error response body]
           (when (and
                   (not error)
                   (= 200 (.-statusCode response)))
             ;(println (str "Downloaded from " url))
+            ;(println (str "Downloaded from " (count body)))
             (put! cout body))))
   cout)
 
@@ -47,6 +49,32 @@
                               ;(println "Read file " fpath)
                               (put! cout  data))))
   cout)
+
+(defn create-dir-fully [dir-path]
+  (if (-> dir-path str/blank? not)
+    (try
+      (.mkdirSync fs  (str dir-path))
+      (catch :default e
+        (create-dir-fully (.dirname path dir-path))
+        (.mkdirSync fs (str dir-path))))))
+
+(defn create-conditionally [dir-path]
+  (try
+    (.statSync fs dir-path)
+    (catch :default e
+      (create-dir-fully dir-path))))
+
+(defn write-file [file-path content]
+  (do
+    (create-conditionally (.dirname path file-path))
+    ;(println "Writing file to " file-path)
+    (.writeFileSync fs file-path content)
+    true))
+
+
+
+
+
 
 (defn read-url-chan [cout url]
   (if (is-url-local? url)
@@ -74,24 +102,24 @@
     y))
 
 
-(defn read-dependency-pipeline [url]
-  (let [c (chan 1 (comp
+(defn read-dependency-pipeline [url-set]
+  "Creates a read depedency pipeline that extracts maven dependecy from a url-set
+  A url set is looks like [repo '(jar-url pom-url)]"
+  (let [repo-url (first url-set)
+        pom-url (-> url-set second first)
+        c (chan 1 (comp
                     (map parse-xml)
                     (map #(js->clj % :keywordize-keys true))
                     (map #(get-in % [:project :dependencies 0 :dependency]))
                     (map clean-deps)
                     (map #(map mvndep->dep %))
                     (map #(into #{} %))
-                    (map #(conj [] url %))
+                    (map #(conj [] repo-url %))
                     ))]
-    (read-url-chan c url)))
+    (read-url-chan c pom-url)))
 
-(defn extract-dependencies [urls]
-  (map read-dependency-pipeline urls))
-
-(defn artifact->coordinate [artifact]
-  (str (:group artifact) "/" (:artifact artifact)))
-
+(defn extract-dependencies [url-set]
+  (map read-dependency-pipeline url-set))
 
 (defn resolve [dep &{:keys [repositories local-repo]} ]
   (go-loop [next dep
@@ -105,8 +133,8 @@
                ;(println next)
                (let [no-excl (dissoc next :exclusions)
                      url-set (create-urls-for-dependency repositories no-excl)
-                     urls (map first url-set)
-                     repo-reqs (extract-dependencies urls)
+                     urls (map #(-> % second first) url-set)
+                     repo-reqs (extract-dependencies url-set)
                      tout (timeout 5000)
                      repo-reqs (conj repo-reqs tout)
                      [[url deps] ch] (alts! repo-reqs)
@@ -170,26 +198,36 @@
    ;:optional optional
    :exclusions (map (comp exclusion normalize-exclusion-spec) exclusions)})
 
+
+(defn download-and-save-pipeline [[download-from save-to]]
+  (let [c (chan 1024 (comp
+                       (map #(write-file save-to %))))]
+    (make-http-request c download-from)))
+
 (defn retrieve [dep in-repo]
-  (let [url (:url dep)
-        jar-url (str/replace url #"pom" "jar")]
-  (println "Downloading " jar-url " to " in-repo)))
+  (let [ repo-url (:url dep)
+        urls (create-urls-for-dependency repo-url dep)
+        save-to-locations (create-urls-for-dependency in-repo dep)
+        urls-to-proc (map vector (second urls) (second save-to-locations))]
+    (map download-and-save-pipeline urls-to-proc)))
 
 (defn retrieve-dependencies [[status dg dep-list] local-repo offline?]
   (let [remote-deps (filter #(-> % :url is-url-local? not) dep-list)]
-    (if offline?
+    (if (and offline? (nil? local-repo))
       nil
-      (map #(retrieve % local-repo) remote-deps))))
+     (flatten (map #(retrieve % local-repo) remote-deps)))))
 
 (defn resolve-dependencies
   [& {:keys [repositories coordinates retrieve local-repo offline?
-             proxy mirrors rmanaged-coordinates repository-session-fn]
+             proxy mirrors managed-coordinates]
       :or {retrieve true}}]
   (go
     (let [repos (or repositories (vals repos))
           deps-map (map dependency coordinates)
           deps-chan (<! (resolve-all deps-map :repositories repos
                                      :local-repo local-repo))]
-      (if retrieve (retrieve-dependencies deps-chan local-repo offline?) deps-chan))))
+      (if retrieve
+        (<!(async/map vector (retrieve-dependencies deps-chan local-repo offline?)))
+        deps-chan))))
 
 
