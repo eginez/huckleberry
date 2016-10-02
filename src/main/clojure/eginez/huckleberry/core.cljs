@@ -94,6 +94,9 @@
         m {:group g :artifact a :version v}]
     m))
 
+(defn dep->coordinate [dep]
+  (str (:group dep) "/" (:artifact dep) " " (:version dep)))
+
 (defn clean-deps [x]
   (let [ y (remove #(or
                      (= "test" (first (:scope %)))
@@ -199,8 +202,9 @@
    :exclusions (map (comp exclusion normalize-exclusion-spec) exclusions)})
 
 
-(defn download-and-save-pipeline [[download-from save-to]]
+(defn download-and-save-pipeline [[download-from save-to] dep]
   (let [c (chan 1024 (comp
+                       (map #(do (println "Downloading " (dep->coordinate dep)) %))
                        (map #(write-file save-to %))))]
     (make-http-request c download-from)))
 
@@ -209,13 +213,15 @@
         urls (create-urls-for-dependency repo-url dep)
         save-to-locations (create-urls-for-dependency in-repo dep)
         urls-to-proc (map vector (second urls) (second save-to-locations))]
-    (map download-and-save-pipeline urls-to-proc)))
+    (map #(download-and-save-pipeline % dep) urls-to-proc)))
 
 (defn retrieve-dependencies [[status dg dep-list] local-repo offline?]
   (let [remote-deps (filter #(-> % :url is-url-local? not) dep-list)]
     (if (and offline? (nil? local-repo))
       nil
-     (flatten (map #(retrieve % local-repo) remote-deps)))))
+      (if (empty? remote-deps)
+        [(go true)]
+        (flatten (map #(retrieve % local-repo) remote-deps))))))
 
 (defn resolve-dependencies
   [& {:keys [repositories coordinates retrieve local-repo offline?

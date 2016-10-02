@@ -106,13 +106,23 @@
 ;          )))))
 
 
+(deftest test-resolve-coordinates-download-all-fulfilled
+  (async done
+    (go
+      (let [ r (<! (maven/resolve-dependencies :coordinates '[[cljs-bach "0.2.0"]]
+                                                         :retrieve true
+                                                         :local-repo "/tmp/huckleberry/test"))]
+        (assert (every? true? r))
+        (done)
+        ))))
+
 (deftest test-resolve-coordinates-download
   (async done
     (go
-      (let [ r (<! (maven/resolve-dependencies :coordinates '[[junit "4.12"]]
-                                                         :retrieve true
-                                                         :local-repo "/tmp/huckleberry/test"))]
-        (println r)
+      (let [ r (<! (maven/resolve-dependencies :coordinates '[[commons-logging "1.1"]]
+                                               :retrieve true
+                                               :local-repo "/tmp/huckleberry/test"))]
+        (assert (every? true? r))
         (done)
         ))))
 
