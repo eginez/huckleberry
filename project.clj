@@ -1,4 +1,5 @@
-(defproject huckleberry "0.1.0"
+(defproject org.eginez/huckleberry "0.1.0"
+  :url "https://github.com/eginez/huckleberry"
   :description "maven dependecy resolution in clojurescript"
   :min-lein-version "2.5.3"
 
