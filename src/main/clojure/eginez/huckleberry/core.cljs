@@ -28,14 +28,10 @@
     (map #(create-remote-url-for-depedency % d) repos)
     (create-remote-url-for-depedency repos d)))
 
-
-
-
 (defn read-url-chan [cout url]
   (if (is-url-local? url)
     (os/read-file cout url)
     (os/make-http-request cout url)))
-
 
 (defn mvndep->dep [x]
   (let [g (first (:groupId x))
@@ -186,5 +182,3 @@
       (if retrieve
         (<!(async/map vector (retrieve-dependencies deps-chan local-repo offline?)))
         deps-chan))))
-
-
