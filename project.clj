@@ -1,5 +1,5 @@
-(defproject huckleberry "0.1.0-SNAPSHOT"
-  :description "FIXME: write this!"
+(defproject huckleberry "0.1.0"
+  :description "maven dependecy resolution in clojurescript"
   :min-lein-version "2.5.3"
 
   :dependencies [[org.clojure/clojure "1.8.0"]

@@ -4,22 +4,18 @@
   (:require [cljs.nodejs :as nodejs]
             [cljs.core.async :refer [timeout close! put! chan <! >! take!  pipeline alts! poll!] :as async]
             [clojure.set :as set]
+            [eginez.huckleberry.os :as os]
             [clojure.string :as str]))
 
-(def path (nodejs/require "path"))
-(def fs (nodejs/require "fs"))
-(def xml2js (nodejs/require "xml2js"))
-(def request (nodejs/require "request"))
 (def repos {:clojars "https://clojars.org/repo"
-            :local (.join path (-> nodejs/process .-env .-HOME) ".m2" "repository")
+            :local (str/join os/SEPARATOR [os/HOME-DIR  ".m2" "repository"])
             :maven-central "https://repo1.maven.org/maven2"})
-;(def dbg (aset request "debug" true))
 
 (defn is-url-local? [url]
   (not (str/starts-with? url "http")))
 
 (defn create-remote-url-for-depedency [repo {group :group artifact :artifact version :version}]
-  (let [sep (if (is-url-local? repo) "/" (.-sep path))
+  (let [sep (if (is-url-local? repo) "/" os/SEPARATOR)
         g (str/replace group #"\." sep)
         art (str/join "-" [artifact version])
         art-url (str/join sep [repo g artifact version art])
@@ -32,60 +28,14 @@
     (map #(create-remote-url-for-depedency % d) repos)
     (create-remote-url-for-depedency repos d)))
 
-(defn make-http-request [cout url]
-  (.get request #js {:url url :encoding nil}
-        (fn [error response body]
-          (when (and
-                  (not error)
-                  (= 200 (.-statusCode response)))
-            ;(println (str "Downloaded from " url))
-            ;(println (str "Downloaded from " (count body)))
-            (put! cout body))))
-  cout)
-
-(defn read-file [cout fpath]
-  (.readFile fs fpath "utf-8"
-             (fn [err data] (when-not err
-                              ;(println "Read file " fpath)
-                              (put! cout  data))))
-  cout)
-
-(defn create-dir-fully [dir-path]
-  (if (-> dir-path str/blank? not)
-    (try
-      (.mkdirSync fs  (str dir-path))
-      (catch :default e
-        (create-dir-fully (.dirname path dir-path))
-        (.mkdirSync fs (str dir-path))))))
-
-(defn create-conditionally [dir-path]
-  (try
-    (.statSync fs dir-path)
-    (catch :default e
-      (create-dir-fully dir-path))))
-
-(defn write-file [file-path content]
-  (do
-    (create-conditionally (.dirname path file-path))
-    ;(println "Writing file to " file-path)
-    (.writeFileSync fs file-path content)
-    true))
-
-
-
 
 
 
 (defn read-url-chan [cout url]
   (if (is-url-local? url)
-    (read-file cout url)
-    (make-http-request cout url)))
+    (os/read-file cout url)
+    (os/make-http-request cout url)))
 
-(defn parse-xml [xmlstring]
-  "Parses the xml"
-  (let [x (chan)]
-    (.parseString xml2js xmlstring #(put! x %2))
-    (poll! x)))
 
 (defn mvndep->dep [x]
   (let [g (first (:groupId x))
@@ -111,7 +61,7 @@
   (let [repo-url (first url-set)
         pom-url (-> url-set second first)
         c (chan 1 (comp
-                    (map parse-xml)
+                    (map os/parse-xml)
                     (map #(js->clj % :keywordize-keys true))
                     (map #(get-in % [:project :dependencies 0 :dependency]))
                     (map clean-deps)
@@ -204,9 +154,9 @@
 
 (defn download-and-save-pipeline [[download-from save-to] dep]
   (let [c (chan 1024 (comp
-                       (map #(do (println "Downloading " (dep->coordinate dep)) %))
-                       (map #(write-file save-to %))))]
-    (make-http-request c download-from)))
+                       (map #(do (println "Downloading " download-from) %))
+                       (map #(os/write-file save-to %))))]
+    (os/make-http-request c download-from)))
 
 (defn retrieve [dep in-repo]
   (let [ repo-url (:url dep)
@@ -224,11 +174,12 @@
         (flatten (map #(retrieve % local-repo) remote-deps))))))
 
 (defn resolve-dependencies
-  [& {:keys [repositories coordinates retrieve local-repo offline?
+  [& {:keys [repositories coordinates retrieve local-repo
              proxy mirrors managed-coordinates]
       :or {retrieve true}}]
   (go
     (let [repos (or repositories (vals repos))
+          offline? false
           deps-map (map dependency coordinates)
           deps-chan (<! (resolve-all deps-map :repositories repos
                                      :local-repo local-repo))]
