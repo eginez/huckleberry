@@ -15,7 +15,7 @@ Huckleberry aims to be a jvm-less replacement for [Pomergranate](https://github.
 ## Installation
 Huckleberry can be found in clojars. Add it to your leiningen project
 ```clojure
-[org.clojars.eginez/huckleberry "0.1.0"]
+[org.clojars.eginez/huckleberry "0.2.0"]
 ```
 
 ## Usage
