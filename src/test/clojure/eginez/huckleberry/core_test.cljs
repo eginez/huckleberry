@@ -146,3 +146,6 @@
         (assert (= 3 (count r)))
         (done)
         ))))
+
+(deftest test-dp-path
+  (assert (not (empty? (huckleberry/dep->path {:group "org.clojure", :artifact "core.cache", :version "0.6.5", :url "tmp/hb/"})))))
