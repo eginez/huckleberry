@@ -2,6 +2,7 @@
   (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [cljs.test :refer-macros [async deftest is testing]]
             [cljs.core.async :refer [put! take! chan <! >!] :as async]
+            [clojure.string :as strg]
             [cljs.pprint :as pp]
             [eginez.huckleberry.core :as huckleberry]))
 
@@ -90,32 +91,58 @@
           (done)
           )))))
 
+(deftest test-retrieve
+  (async done
+    (go
+      (let [dp  (<! (huckleberry/retrieve
+                      {:group "log4j", :artifact "log4j", :version "1.2.12" :url "https://repo1.maven.org/maven2"} "/tmp/huckleberry/test"))]
+        (println dp)
+        (done)))))
+
+(deftest retrieve-dep-list
+  (async done
+    (go
+      (let [dp (<! (huckleberry/retrieve-dependencies
+                     [nil nil [
+                               {:group "commons-logging" :artifact "commons-logging" :version "1.1" :url "https://repo1.maven.org/maven2"}
+                               {:group "log4j", :artifact "log4j", :version "1.2.12" :url "https://repo1.maven.org/maven2"}
+                               ]]
+                      "/tmp/huckleberry/test" false))]
+        (assert (= (count dp) 2))
+        (assert (strg/includes? (:url (first dp)) "/tmp/huckleberry"))
+        (done)))))
+
+
+(deftest retrieve-dep-list-with-local
+  (async done
+    (go
+      (let [dp (<! (huckleberry/retrieve-dependencies
+                     [nil nil [
+                               {:group "commons-logging" :artifact "commons-logging" :version "1.1" :url "https://repo1.maven.org/maven2"}
+                               {:group "log4j", :artifact "log4j", :version "1.2.12" :url "/dev/null"}
+                               ]]
+                     "/tmp/huckleberry/test" false))]
+        (assert (= (count dp) 2))
+        (println dp)
+        (done)))))
+
 (deftest test-resolve-coordinates-download
   (async done
     (go
       (let [ r (<! (huckleberry/resolve-dependencies :coordinates '[[commons-logging "1.1"]]
                                                      :retrieve true
                                                      :local-repo "/tmp/huckleberry/test"))]
-        ;(assert (not (empty? r)))
-        (println r)
+        (assert (not (empty? r)))
+        ;(println r)
         (done)
         ))))
 
-;(deftest test-resolve-coordinates-download-all-fulfilled
-;  (async done
-;    (go
-;      (let [ r (<! (maven/resolve-dependencies :coordinates '[[cljs-bach "0.2.0"]]
-;                                               :retrieve true
-;                                               :local-repo "/tmp/huckleberry/test"))]
-;        (assert (every? true? r))
-;        (done)
-;        ))))
-
-;(deftest test-download-jar
-;  (async done
-;    (go
-;      (let [ c (chan 1)
-;            d (<! (maven/make-http-request c "https://repo1.maven.org/maven2/avalon-framework/avalon-framework/4.1.3/avalon-framework-4.1.3.jar"))]
-;        ;(println (take 10 d))
-;        (done)
-;        ))))
+(deftest test-resolve-coordinates-no-download
+  (async done
+    (go
+      (let [ r (<! (huckleberry/resolve-dependencies :coordinates '[[commons-logging "1.1"]]
+                                                     :retrieve false
+                                                     :local-repo "/tmp/huckleberry/test"))]
+        (assert (= 3 (count r)))
+        (done)
+        ))))

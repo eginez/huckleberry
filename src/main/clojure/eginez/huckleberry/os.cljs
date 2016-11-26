@@ -47,13 +47,14 @@
   (try
     (.statSync fs dir-path)
     (catch :default e
+      ;TODO catch valid writing errors
       (create-dir-fully dir-path))))
 
-(defn write-file [dep file-path content]
+(defn write-file [file-path content]
   (do
     (create-conditionally (.dirname path file-path))
     (.writeFileSync fs file-path content)
-    dep))
+    true))
 
 
 (defn parse-xml [xmlstring]

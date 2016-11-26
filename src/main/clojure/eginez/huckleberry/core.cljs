@@ -153,11 +153,10 @@
    :exclusions (map (comp exclusion normalize-exclusion-spec) exclusions)})
 
 
-(defn download-and-save-pipeline [[download-from save-to] dep]
+(defn download-and-save-pipeline [[download-from save-to]]
   (let [c (chan 1024 (comp
-                       (map #(do (println "Downloading " download-from) %))
-                       (map #(os/write-file dep save-to %))))]
-                       ;(map #(do (println "returning " dep) (identity dep)))))]
+                       ;(map #(do (println "saving  " download-from) %))
+                       (map #(os/write-file save-to %))))]
 
     (os/make-http-request c download-from)))
 
@@ -166,19 +165,35 @@
         urls (create-urls-for-dependency repo-url dep)
         save-to-locations (create-urls-for-dependency in-repo dep)
         urls-to-proc (map vector (second urls) (second save-to-locations))
-        chan-deps (map #(download-and-save-pipeline % (assoc dep :url in-repo)) urls-to-proc)]
-    chan-deps))
+        local-deps (assoc dep :url in-repo)
+        c-jar (download-and-save-pipeline (second urls-to-proc))
+        c-pom (download-and-save-pipeline (first urls-to-proc))]
+      (go
+        (println "Downloading" (first (second urls-to-proc)))
+        (<! c-jar)
+        (<! c-pom)
+        local-deps)))
 
-(defn retrieve-dependencies [[status dg dep-list] local-repo offline?]
-  (let [remote-deps (filter #(-> % :url is-url-local? not) dep-list)]
+(defn retrieve-all [local-deps to-do in-repo]
+  (go-loop [done local-deps
+            todo to-do
+            local-repo in-repo]
+    (if (empty? todo)
+      done
+    (let [next (first todo)
+          curr (<! (retrieve next in-repo))
+          dn (conj done curr)]
+      (recur dn (rest todo) in-repo)))))
+
+(defn retrieve-dependencies [[_ _ dep-list] local-repo offline?]
+  (let [ local-deps (filter #(-> % :url is-url-local? ) dep-list)
+        remote-deps (filter #(-> % :url is-url-local? not) dep-list)]
     (if (and offline? (nil? local-repo))
       nil
       (if (empty? remote-deps)
-        [(go dep-list)]
-        (let [chns (map #(retrieve % local-repo) remote-deps)]
-          (do
-            ;(println (flatten chns))
-            (async/map vector (flatten chns))))))))
+        (go dep-list)
+        (retrieve-all local-deps remote-deps local-repo)))))
+
 
 (defn resolve-dependencies
   [& {:keys [repositories coordinates retrieve local-repo
@@ -193,5 +208,5 @@
           deps-chan (<! (resolve-all deps-map :repositories reps
                                      :local-repo local-repo))]
       (if retrieve
-        (<! (retrieve-dependencies deps-chan l-repo offline?))
+        (<!(retrieve-dependencies deps-chan l-repo offline?))
         deps-chan))))

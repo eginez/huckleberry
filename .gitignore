@@ -9,3 +9,4 @@ out/
 .idea
 huckleberry.iml
 target/
+.lein-repl-history

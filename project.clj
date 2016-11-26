@@ -37,7 +37,7 @@
                                    :output-dir "out"
                                    :optimizations :none
                                    :parallel-build true
-                                   :source-map "out/sourcemap.js"}}
+                                   :source-map true}}
                        {:id "test"
                         :source-paths[ "src/main/clojure" "src/test/clojure"]
                         :compiler {
