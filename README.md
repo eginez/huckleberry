@@ -1,4 +1,4 @@
-# Huckleberry
+# Huckleberry [![Clojars Project](https://img.shields.io/clojars/v/org.clojars.eginez/huckleberry.svg)](https://clojars.org/org.clojars.eginez/huckleberry)
 A clojurescript library that provides dependency resolution for maven artifacts.
 Huckleberry aims to be a jvm-less replacement for [Pomergranate](https://github.com/cemerick/pomegranate) and [Aether](https://github.com/sonatype/sonatype-aether), where possible. 
 
