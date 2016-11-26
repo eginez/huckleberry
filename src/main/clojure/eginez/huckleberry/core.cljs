@@ -7,7 +7,7 @@
             [eginez.huckleberry.os :as os]
             [clojure.string :as str]))
 
-(def repos {:clojars "https://clojars.org/repo"
+(def default-repos {:clojars "https://clojars.org/repo"
             :local (str/join os/SEPARATOR [os/HOME-DIR  ".m2" "repository"])
             :maven-central "https://repo1.maven.org/maven2"})
 
@@ -39,6 +39,11 @@
         v (first (:version x))
         m {:group g :artifact a :version v}]
     m))
+
+(defn dep->path[x]
+  (let [[r [pom jar]] (create-remote-url-for-depedency (:url x) x)]
+    jar))
+
 
 (defn dep->coordinate [dep]
   (str (:group dep) "/" (:artifact dep) " " (:version dep)))
@@ -79,7 +84,7 @@
             status true]
            (if next
              (do
-               ;(println next)
+               ;(println repositories)
                (let [no-excl (dissoc next :exclusions)
                      url-set (create-urls-for-dependency repositories no-excl)
                      urls (map #(-> % second first) url-set)
@@ -151,34 +156,42 @@
 (defn download-and-save-pipeline [[download-from save-to] dep]
   (let [c (chan 1024 (comp
                        (map #(do (println "Downloading " download-from) %))
-                       (map #(os/write-file save-to %))))]
+                       (map #(os/write-file dep save-to %))))]
+                       ;(map #(do (println "returning " dep) (identity dep)))))]
+
     (os/make-http-request c download-from)))
 
 (defn retrieve [dep in-repo]
   (let [ repo-url (:url dep)
         urls (create-urls-for-dependency repo-url dep)
         save-to-locations (create-urls-for-dependency in-repo dep)
-        urls-to-proc (map vector (second urls) (second save-to-locations))]
-    (map #(download-and-save-pipeline % dep) urls-to-proc)))
+        urls-to-proc (map vector (second urls) (second save-to-locations))
+        chan-deps (map #(download-and-save-pipeline % (assoc dep :url in-repo)) urls-to-proc)]
+    chan-deps))
 
 (defn retrieve-dependencies [[status dg dep-list] local-repo offline?]
   (let [remote-deps (filter #(-> % :url is-url-local? not) dep-list)]
     (if (and offline? (nil? local-repo))
       nil
       (if (empty? remote-deps)
-        [(go true)]
-        (flatten (map #(retrieve % local-repo) remote-deps))))))
+        [(go dep-list)]
+        (let [chns (map #(retrieve % local-repo) remote-deps)]
+          (do
+            ;(println (flatten chns))
+            (async/map vector (flatten chns))))))))
 
 (defn resolve-dependencies
   [& {:keys [repositories coordinates retrieve local-repo
              proxy mirrors managed-coordinates]
       :or {retrieve true}}]
   (go
-    (let [repos (or repositories (vals repos))
+    (let [
+          l-repo (or local-repo (:local default-repos))
+          reps (or repositories (vals (assoc default-repos :local l-repo)))
           offline? false
           deps-map (map dependency coordinates)
-          deps-chan (<! (resolve-all deps-map :repositories repos
+          deps-chan (<! (resolve-all deps-map :repositories reps
                                      :local-repo local-repo))]
       (if retrieve
-        (<!(async/map vector (retrieve-dependencies deps-chan local-repo offline?)))
+        (<! (retrieve-dependencies deps-chan l-repo offline?))
         deps-chan))))

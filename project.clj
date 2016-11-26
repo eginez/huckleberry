@@ -1,4 +1,4 @@
-(defproject org.clojars.eginez/huckleberry "0.1.0"
+(defproject org.clojars.eginez/huckleberry "0.2.0"
   :url "https://github.com/eginez/huckleberry"
   :description "maven dependecy resolution in clojurescript"
   :min-lein-version "2.5.3"
@@ -7,17 +7,17 @@
 
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.229"]
-                 [org.clojure/core.async "0.2.391"]]
+                 [andare "0.4.0"]]
 
   :plugins [[lein-cljsbuild "1.1.3"]
             [lein-cljfmt "0.5.3"]
             [lein-doo "0.1.7"]
             [lein-npm "0.6.2"]]
 
-  :source-paths ["src"]
+  :source-paths ["src/main/clojure"]
+  :test-paths ["src/test/clojure" "src/main/clojure"]
 
-  :clean-targets ["main.js"
-                  "target"]
+  :clean-targets ["main.js" "out" "target"]
 
   :npm {
         :dependencies [[xml2js "0.4.17"]
@@ -37,7 +37,7 @@
                                    :output-dir "out"
                                    :optimizations :none
                                    :parallel-build true
-                                   :source-map true}}
+                                   :source-map "out/sourcemap.js"}}
                        {:id "test"
                         :source-paths[ "src/main/clojure" "src/test/clojure"]
                         :compiler {

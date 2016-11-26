@@ -49,11 +49,11 @@
     (catch :default e
       (create-dir-fully dir-path))))
 
-(defn write-file [file-path content]
+(defn write-file [dep file-path content]
   (do
     (create-conditionally (.dirname path file-path))
     (.writeFileSync fs file-path content)
-    true))
+    dep))
 
 
 (defn parse-xml [xmlstring]
