@@ -10,3 +10,4 @@ out/
 huckleberry.iml
 target/
 .lein-repl-history
+figwheel_server.log
