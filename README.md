@@ -3,7 +3,7 @@ A clojurescript library that provides dependency resolution for maven artifacts.
 Huckleberry aims to be a jvm-less replacement for [Pomergranate](https://github.com/cemerick/pomegranate) and [Aether](https://github.com/sonatype/sonatype-aether), where possible. 
 
 ## Huckleberry supports
-* Maven dependencies expressed in lenin style coordinates eg: [commons-logging "1.0"]
+* Maven dependencies expressed in lein style coordinates eg: [commons-logging "1.0"]
 * Local repo
 * Exclusions
 
