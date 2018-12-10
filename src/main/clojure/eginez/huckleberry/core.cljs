@@ -51,7 +51,8 @@
 (defn clean-deps [x]
   (let [ y (remove #(or
                      (= "test" (first (:scope %)))
-                     (= "true" (first (:optional %))))
+                     (= "true" (first (:optional %)))
+                     (nil? (:version %)))
                    x)]
     y))
 
@@ -60,23 +61,27 @@
                                :properties
                                first
                                (map (fn [[k v]] [k (first v)]))
-                               (into {}))]
-    (->> project
-         :dependencies
-         first
-         :dependency
-         (map (fn [dep]
-                (->> dep
-                     (map (fn [[k v]]
-                            (let [match (re-find #"^\$\{(.*)\}"
-                                                 (str (first v)))]
-                              (if match
-                                [k [(-> match
-                                        second
-                                        keyword
-                                        properties-lookup)]]
-                                [k v]))))
-                     (into {})))))))
+                               (into {}))
+        parent (->> project :parent first)
+        dependencies (->> project
+                          :dependencies
+                          first
+                          :dependency
+                          (map (fn [dep]
+                                 (->> dep
+                                      (map (fn [[k v]]
+                                             (let [match (re-find #"^\$\{(.*)\}"
+                                                                  (str (first v)))]
+                                               (if match
+                                                 [k [(-> match
+                                                         second
+                                                         keyword
+                                                         properties-lookup)]]
+                                                 [k v]))))
+                                      (into {})))))]
+    (if parent
+      (conj dependencies parent)
+      dependencies)))
 
 (defn read-dependency-pipeline [url-set]
   "Creates a read depedency pipeline that extracts maven dependecy from a url-set
