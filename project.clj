@@ -1,5 +1,5 @@
-(defproject org.clojars.eginez/huckleberry "0.2.0"
-  :url "https://github.com/eginez/huckleberry"
+(defproject org.clojars.thisdotrob/huckleberry "0.2.1"
+  :url "https://github.com/thisdotrob/huckleberry"
   :description "maven dependecy resolution in clojurescript"
   :min-lein-version "2.5.3"
   :license {:name "Eclipse Public License"
@@ -33,7 +33,7 @@
                         :source-paths ["src/main/clojure" "src/dev/clojure"]
                         :figwheel true
                         :compiler {
-                                   :main eginez.huckleberry.runner
+                                   :main thisdotrob.huckleberry.runner
                                    :output-to "out/main.js"
                                    :target :nodejs
                                    :output-dir "out"
@@ -43,7 +43,7 @@
                        {:id "test"
                         :source-paths[ "src/main/clojure" "src/test/clojure"]
                         :compiler {
-                                   :main eginez.huckleberry.test-runner
+                                   :main thisdotrob.huckleberry.test-runner
                                    :output-to "out/test.js"
                                    :target :nodejs
                                    :output-dir "out/test"

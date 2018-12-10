@@ -1,4 +1,4 @@
-(ns eginez.huckleberry.os
+(ns thisdotrob.huckleberry.os
   (:require-macros [cljs.core.async.macros :refer [go-loop go]])
   (:refer-clojure :exclude  [type proxy])
   (:require [cljs.nodejs :as nodejs]
@@ -20,12 +20,12 @@
 (defn make-http-request [cout url]
   (.get request #js {:url url :encoding nil}
         (fn [error response body]
-          (when (and
-                  (not error)
-                  (= 200 (.-statusCode response)))
-            ;(println (str "Downloaded from " url))
-            ;(println (str "Downloaded from " (count body)))
-            (put! cout body))))
+          (if error
+            (println       "error from       " url)
+            (if (= 200 (.-statusCode response))
+              (do (println "200 received from" url)
+                  (put! cout body))
+              (println     "Non-200 from     " url)))))
   cout)
 
 (defn read-file [cout fpath]

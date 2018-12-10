@@ -1,4 +1,4 @@
-(ns ^:figwheel-always eginez.huckleberry.runner
+(ns ^:figwheel-always thisdotrob.huckleberry.runner
   (:require [cljs.nodejs :as nodejs]))
 
 (nodejs/enable-util-print!)
