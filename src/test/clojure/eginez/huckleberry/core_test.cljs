@@ -38,8 +38,8 @@
     (go
       (let [[status d locations] (<! (huckleberry/resolve test-dep7 :repositories (vals huckleberry/default-repos)))]
         (assert (true? status))
-        (assert (= 4 (-> d keys count)))
-        (assert (= 4 (-> locations count)))
+        (assert (= 7 (-> d keys count)))
+        (assert (= 7 (-> locations count)))
         (done)))))
 
 (deftest test-resolve-single-with-parent

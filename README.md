@@ -32,6 +32,10 @@ Will return channel that will output the status of each of the files that need t
 
 For more examples on how to use the library look in the test [directory](https://github.com/eginez/huckleberry/blob/master/src/test/clojure/eginez/huckleberry/core_test.cljs)
 
+## Running the tests
+
+Run `lein deps` followed by `lein doo node test`.
+
 ## License
 
 Copyright (C) 2016 Esteban Ginez
