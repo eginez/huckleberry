@@ -6,6 +6,7 @@ Huckleberry aims to be a jvm-less replacement for [Pomergranate](https://github.
 * Maven dependencies expressed in lein style coordinates eg: [commons-logging "1.0"]
 * Local repo
 * Exclusions
+* Resolving transient dependencies via the parent or using versions interpolated from the properties in the POM file where required.
 
 ## Huckleberry does not support
 * Proxies or Mirrors
