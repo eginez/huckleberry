@@ -15,6 +15,8 @@
 (def test-dep5 {:group "org.clojure" :artifact "clojure" :version "1.8.0"})
 (def test-dep6 {:group "commons-logging" :artifact "commons-logging" :version "1.1"
                 :exclusions [{:group "avalon-framework" :artifact "avalon-framework" :version "4.1.3"}]})
+(def test-dep7 {:group "org.clojure" :artifact "core.specs.alpha" :version "0.1.24"})
+(def test-dep8 {:group "org.apache.httpcomponents" :artifact "httpasyncclient" :version "4.1.3"})
 
 (def test-url (huckleberry/create-urls-for-dependency (:maven-central huckleberry/default-repos) test-dep))
 
@@ -29,6 +31,26 @@
         (assert (true? status))
         (assert (= 5 (-> d keys count)))
         (assert (= 5 (-> locations count)))
+        (done)))))
+
+(deftest test-resolve-single-with-variable-interpolation
+  (async done
+    (go
+      (let [[status d locations] (<! (huckleberry/resolve test-dep7 :repositories (vals huckleberry/default-repos)))]
+        (assert (true? status))
+        (assert (= 7 (-> d keys count)))
+        (assert (= 7 (-> locations count)))
+        (done)))))
+
+(deftest test-resolve-single-with-parent
+  (async done
+    (go
+      (let [[status d locations] (<! (huckleberry/resolve test-dep8 :repositories (vals huckleberry/default-repos)))]
+        (println (-> d keys count))
+        (println (-> locations count))
+        (assert (true? status))
+        (assert (= 4 (-> d keys count)))
+        (assert (= 4 (-> locations count)))
         (done)))))
 
 (deftest test-resolve-all-single

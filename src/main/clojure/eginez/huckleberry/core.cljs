@@ -51,10 +51,37 @@
 (defn clean-deps [x]
   (let [ y (remove #(or
                      (= "test" (first (:scope %)))
-                     (= "true" (first (:optional %))))
+                     (= "true" (first (:optional %)))
+                     (nil? (:version %)))
                    x)]
     y))
 
+(defn extract-deps [{:keys [project] :as parsed-xml}]
+  (let [properties-lookup (->> project
+                               :properties
+                               first
+                               (map (fn [[k v]] [k (first v)]))
+                               (into {}))
+        parent (->> project :parent first)
+        dependencies (->> project
+                          :dependencies
+                          first
+                          :dependency
+                          (map (fn [dep]
+                                 (->> dep
+                                      (map (fn [[k v]]
+                                             (let [match (re-find #"^\$\{(.*)\}"
+                                                                  (str (first v)))]
+                                               (if match
+                                                 [k [(-> match
+                                                         second
+                                                         keyword
+                                                         properties-lookup)]]
+                                                 [k v]))))
+                                      (into {})))))]
+    (if parent
+      (conj dependencies parent)
+      dependencies)))
 
 (defn read-dependency-pipeline [url-set]
   "Creates a read depedency pipeline that extracts maven dependecy from a url-set
@@ -64,7 +91,7 @@
         c (chan 1 (comp
                     (map os/parse-xml)
                     (map #(js->clj % :keywordize-keys true))
-                    (map #(get-in % [:project :dependencies 0 :dependency]))
+                    (map extract-deps)
                     (map clean-deps)
                     (map #(map mvndep->dep %))
                     (map #(into #{} %))
